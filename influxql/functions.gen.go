@@ -8,12 +8,12 @@ package influxql
 
 // FloatPointAggregator aggregates points to produce a single point.
 type FloatPointAggregator interface {
-	Aggregate(p *FloatPoint)
+	Aggregate(points ...*FloatPoint)
 }
 
 // FloatPointEmitter produces a single point from an aggregate.
 type FloatPointEmitter interface {
-	Emit() *FloatPoint
+	Emit() []FloatPoint
 }
 
 // FloatReduceFunc is the function called by a FloatPoint reducer.
@@ -28,19 +28,59 @@ func NewFloatFuncReducer(fn FloatReduceFunc) *FloatFuncReducer {
 	return &FloatFuncReducer{fn: fn}
 }
 
-func (r *FloatFuncReducer) Aggregate(p *FloatPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &FloatPoint{}
+func (r *FloatFuncReducer) Aggregate(points ...*FloatPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &FloatPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *FloatFuncReducer) Emit() *FloatPoint {
-	return r.prev
+func (r *FloatFuncReducer) Emit() []FloatPoint {
+	return []FloatPoint{*r.prev}
+}
+
+// FloatReduceSliceFunc is the function called by a FloatPoint reducer.
+type FloatReduceSliceFunc func(a []FloatPoint) []FloatPoint
+
+type FloatSliceFuncReducer struct {
+	points []FloatPoint
+	fn     FloatReduceSliceFunc
+}
+
+func NewFloatSliceFuncReducer(fn FloatReduceSliceFunc) *FloatSliceFuncReducer {
+	return &FloatSliceFuncReducer{fn: fn}
+}
+
+func (r *FloatSliceFuncReducer) Aggregate(points ...*FloatPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]FloatPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *FloatSliceFuncReducer) Emit() []FloatPoint {
+	return r.fn(r.points)
 }
 
 // FloatReduceIntegerFunc is the function called by a FloatPoint reducer.
@@ -55,19 +95,59 @@ func NewFloatFuncIntegerReducer(fn FloatReduceIntegerFunc) *FloatFuncIntegerRedu
 	return &FloatFuncIntegerReducer{fn: fn}
 }
 
-func (r *FloatFuncIntegerReducer) Aggregate(p *FloatPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &IntegerPoint{}
+func (r *FloatFuncIntegerReducer) Aggregate(points ...*FloatPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &IntegerPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *FloatFuncIntegerReducer) Emit() *IntegerPoint {
-	return r.prev
+func (r *FloatFuncIntegerReducer) Emit() []IntegerPoint {
+	return []IntegerPoint{*r.prev}
+}
+
+// FloatReduceIntegerSliceFunc is the function called by a FloatPoint reducer.
+type FloatReduceIntegerSliceFunc func(a []FloatPoint) []IntegerPoint
+
+type FloatSliceFuncIntegerReducer struct {
+	points []FloatPoint
+	fn     FloatReduceIntegerSliceFunc
+}
+
+func NewFloatSliceFuncIntegerReducer(fn FloatReduceIntegerSliceFunc) *FloatSliceFuncIntegerReducer {
+	return &FloatSliceFuncIntegerReducer{fn: fn}
+}
+
+func (r *FloatSliceFuncIntegerReducer) Aggregate(points ...*FloatPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]FloatPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *FloatSliceFuncIntegerReducer) Emit() []IntegerPoint {
+	return r.fn(r.points)
 }
 
 // FloatReduceStringFunc is the function called by a FloatPoint reducer.
@@ -82,19 +162,59 @@ func NewFloatFuncStringReducer(fn FloatReduceStringFunc) *FloatFuncStringReducer
 	return &FloatFuncStringReducer{fn: fn}
 }
 
-func (r *FloatFuncStringReducer) Aggregate(p *FloatPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &StringPoint{}
+func (r *FloatFuncStringReducer) Aggregate(points ...*FloatPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &StringPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *FloatFuncStringReducer) Emit() *StringPoint {
-	return r.prev
+func (r *FloatFuncStringReducer) Emit() []StringPoint {
+	return []StringPoint{*r.prev}
+}
+
+// FloatReduceStringSliceFunc is the function called by a FloatPoint reducer.
+type FloatReduceStringSliceFunc func(a []FloatPoint) []StringPoint
+
+type FloatSliceFuncStringReducer struct {
+	points []FloatPoint
+	fn     FloatReduceStringSliceFunc
+}
+
+func NewFloatSliceFuncStringReducer(fn FloatReduceStringSliceFunc) *FloatSliceFuncStringReducer {
+	return &FloatSliceFuncStringReducer{fn: fn}
+}
+
+func (r *FloatSliceFuncStringReducer) Aggregate(points ...*FloatPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]FloatPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *FloatSliceFuncStringReducer) Emit() []StringPoint {
+	return r.fn(r.points)
 }
 
 // FloatReduceBooleanFunc is the function called by a FloatPoint reducer.
@@ -109,29 +229,69 @@ func NewFloatFuncBooleanReducer(fn FloatReduceBooleanFunc) *FloatFuncBooleanRedu
 	return &FloatFuncBooleanReducer{fn: fn}
 }
 
-func (r *FloatFuncBooleanReducer) Aggregate(p *FloatPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &BooleanPoint{}
+func (r *FloatFuncBooleanReducer) Aggregate(points ...*FloatPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &BooleanPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *FloatFuncBooleanReducer) Emit() *BooleanPoint {
-	return r.prev
+func (r *FloatFuncBooleanReducer) Emit() []BooleanPoint {
+	return []BooleanPoint{*r.prev}
+}
+
+// FloatReduceBooleanSliceFunc is the function called by a FloatPoint reducer.
+type FloatReduceBooleanSliceFunc func(a []FloatPoint) []BooleanPoint
+
+type FloatSliceFuncBooleanReducer struct {
+	points []FloatPoint
+	fn     FloatReduceBooleanSliceFunc
+}
+
+func NewFloatSliceFuncBooleanReducer(fn FloatReduceBooleanSliceFunc) *FloatSliceFuncBooleanReducer {
+	return &FloatSliceFuncBooleanReducer{fn: fn}
+}
+
+func (r *FloatSliceFuncBooleanReducer) Aggregate(points ...*FloatPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]FloatPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *FloatSliceFuncBooleanReducer) Emit() []BooleanPoint {
+	return r.fn(r.points)
 }
 
 // IntegerPointAggregator aggregates points to produce a single point.
 type IntegerPointAggregator interface {
-	Aggregate(p *IntegerPoint)
+	Aggregate(points ...*IntegerPoint)
 }
 
 // IntegerPointEmitter produces a single point from an aggregate.
 type IntegerPointEmitter interface {
-	Emit() *IntegerPoint
+	Emit() []IntegerPoint
 }
 
 // IntegerReduceFloatFunc is the function called by a IntegerPoint reducer.
@@ -146,19 +306,59 @@ func NewIntegerFuncFloatReducer(fn IntegerReduceFloatFunc) *IntegerFuncFloatRedu
 	return &IntegerFuncFloatReducer{fn: fn}
 }
 
-func (r *IntegerFuncFloatReducer) Aggregate(p *IntegerPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &FloatPoint{}
+func (r *IntegerFuncFloatReducer) Aggregate(points ...*IntegerPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &FloatPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *IntegerFuncFloatReducer) Emit() *FloatPoint {
-	return r.prev
+func (r *IntegerFuncFloatReducer) Emit() []FloatPoint {
+	return []FloatPoint{*r.prev}
+}
+
+// IntegerReduceFloatSliceFunc is the function called by a IntegerPoint reducer.
+type IntegerReduceFloatSliceFunc func(a []IntegerPoint) []FloatPoint
+
+type IntegerSliceFuncFloatReducer struct {
+	points []IntegerPoint
+	fn     IntegerReduceFloatSliceFunc
+}
+
+func NewIntegerSliceFuncFloatReducer(fn IntegerReduceFloatSliceFunc) *IntegerSliceFuncFloatReducer {
+	return &IntegerSliceFuncFloatReducer{fn: fn}
+}
+
+func (r *IntegerSliceFuncFloatReducer) Aggregate(points ...*IntegerPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]IntegerPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *IntegerSliceFuncFloatReducer) Emit() []FloatPoint {
+	return r.fn(r.points)
 }
 
 // IntegerReduceFunc is the function called by a IntegerPoint reducer.
@@ -173,19 +373,59 @@ func NewIntegerFuncReducer(fn IntegerReduceFunc) *IntegerFuncReducer {
 	return &IntegerFuncReducer{fn: fn}
 }
 
-func (r *IntegerFuncReducer) Aggregate(p *IntegerPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &IntegerPoint{}
+func (r *IntegerFuncReducer) Aggregate(points ...*IntegerPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &IntegerPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *IntegerFuncReducer) Emit() *IntegerPoint {
-	return r.prev
+func (r *IntegerFuncReducer) Emit() []IntegerPoint {
+	return []IntegerPoint{*r.prev}
+}
+
+// IntegerReduceSliceFunc is the function called by a IntegerPoint reducer.
+type IntegerReduceSliceFunc func(a []IntegerPoint) []IntegerPoint
+
+type IntegerSliceFuncReducer struct {
+	points []IntegerPoint
+	fn     IntegerReduceSliceFunc
+}
+
+func NewIntegerSliceFuncReducer(fn IntegerReduceSliceFunc) *IntegerSliceFuncReducer {
+	return &IntegerSliceFuncReducer{fn: fn}
+}
+
+func (r *IntegerSliceFuncReducer) Aggregate(points ...*IntegerPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]IntegerPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *IntegerSliceFuncReducer) Emit() []IntegerPoint {
+	return r.fn(r.points)
 }
 
 // IntegerReduceStringFunc is the function called by a IntegerPoint reducer.
@@ -200,19 +440,59 @@ func NewIntegerFuncStringReducer(fn IntegerReduceStringFunc) *IntegerFuncStringR
 	return &IntegerFuncStringReducer{fn: fn}
 }
 
-func (r *IntegerFuncStringReducer) Aggregate(p *IntegerPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &StringPoint{}
+func (r *IntegerFuncStringReducer) Aggregate(points ...*IntegerPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &StringPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *IntegerFuncStringReducer) Emit() *StringPoint {
-	return r.prev
+func (r *IntegerFuncStringReducer) Emit() []StringPoint {
+	return []StringPoint{*r.prev}
+}
+
+// IntegerReduceStringSliceFunc is the function called by a IntegerPoint reducer.
+type IntegerReduceStringSliceFunc func(a []IntegerPoint) []StringPoint
+
+type IntegerSliceFuncStringReducer struct {
+	points []IntegerPoint
+	fn     IntegerReduceStringSliceFunc
+}
+
+func NewIntegerSliceFuncStringReducer(fn IntegerReduceStringSliceFunc) *IntegerSliceFuncStringReducer {
+	return &IntegerSliceFuncStringReducer{fn: fn}
+}
+
+func (r *IntegerSliceFuncStringReducer) Aggregate(points ...*IntegerPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]IntegerPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *IntegerSliceFuncStringReducer) Emit() []StringPoint {
+	return r.fn(r.points)
 }
 
 // IntegerReduceBooleanFunc is the function called by a IntegerPoint reducer.
@@ -227,29 +507,69 @@ func NewIntegerFuncBooleanReducer(fn IntegerReduceBooleanFunc) *IntegerFuncBoole
 	return &IntegerFuncBooleanReducer{fn: fn}
 }
 
-func (r *IntegerFuncBooleanReducer) Aggregate(p *IntegerPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &BooleanPoint{}
+func (r *IntegerFuncBooleanReducer) Aggregate(points ...*IntegerPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &BooleanPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *IntegerFuncBooleanReducer) Emit() *BooleanPoint {
-	return r.prev
+func (r *IntegerFuncBooleanReducer) Emit() []BooleanPoint {
+	return []BooleanPoint{*r.prev}
+}
+
+// IntegerReduceBooleanSliceFunc is the function called by a IntegerPoint reducer.
+type IntegerReduceBooleanSliceFunc func(a []IntegerPoint) []BooleanPoint
+
+type IntegerSliceFuncBooleanReducer struct {
+	points []IntegerPoint
+	fn     IntegerReduceBooleanSliceFunc
+}
+
+func NewIntegerSliceFuncBooleanReducer(fn IntegerReduceBooleanSliceFunc) *IntegerSliceFuncBooleanReducer {
+	return &IntegerSliceFuncBooleanReducer{fn: fn}
+}
+
+func (r *IntegerSliceFuncBooleanReducer) Aggregate(points ...*IntegerPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]IntegerPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *IntegerSliceFuncBooleanReducer) Emit() []BooleanPoint {
+	return r.fn(r.points)
 }
 
 // StringPointAggregator aggregates points to produce a single point.
 type StringPointAggregator interface {
-	Aggregate(p *StringPoint)
+	Aggregate(points ...*StringPoint)
 }
 
 // StringPointEmitter produces a single point from an aggregate.
 type StringPointEmitter interface {
-	Emit() *StringPoint
+	Emit() []StringPoint
 }
 
 // StringReduceFloatFunc is the function called by a StringPoint reducer.
@@ -264,19 +584,59 @@ func NewStringFuncFloatReducer(fn StringReduceFloatFunc) *StringFuncFloatReducer
 	return &StringFuncFloatReducer{fn: fn}
 }
 
-func (r *StringFuncFloatReducer) Aggregate(p *StringPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &FloatPoint{}
+func (r *StringFuncFloatReducer) Aggregate(points ...*StringPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &FloatPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *StringFuncFloatReducer) Emit() *FloatPoint {
-	return r.prev
+func (r *StringFuncFloatReducer) Emit() []FloatPoint {
+	return []FloatPoint{*r.prev}
+}
+
+// StringReduceFloatSliceFunc is the function called by a StringPoint reducer.
+type StringReduceFloatSliceFunc func(a []StringPoint) []FloatPoint
+
+type StringSliceFuncFloatReducer struct {
+	points []StringPoint
+	fn     StringReduceFloatSliceFunc
+}
+
+func NewStringSliceFuncFloatReducer(fn StringReduceFloatSliceFunc) *StringSliceFuncFloatReducer {
+	return &StringSliceFuncFloatReducer{fn: fn}
+}
+
+func (r *StringSliceFuncFloatReducer) Aggregate(points ...*StringPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]StringPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *StringSliceFuncFloatReducer) Emit() []FloatPoint {
+	return r.fn(r.points)
 }
 
 // StringReduceIntegerFunc is the function called by a StringPoint reducer.
@@ -291,19 +651,59 @@ func NewStringFuncIntegerReducer(fn StringReduceIntegerFunc) *StringFuncIntegerR
 	return &StringFuncIntegerReducer{fn: fn}
 }
 
-func (r *StringFuncIntegerReducer) Aggregate(p *StringPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &IntegerPoint{}
+func (r *StringFuncIntegerReducer) Aggregate(points ...*StringPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &IntegerPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *StringFuncIntegerReducer) Emit() *IntegerPoint {
-	return r.prev
+func (r *StringFuncIntegerReducer) Emit() []IntegerPoint {
+	return []IntegerPoint{*r.prev}
+}
+
+// StringReduceIntegerSliceFunc is the function called by a StringPoint reducer.
+type StringReduceIntegerSliceFunc func(a []StringPoint) []IntegerPoint
+
+type StringSliceFuncIntegerReducer struct {
+	points []StringPoint
+	fn     StringReduceIntegerSliceFunc
+}
+
+func NewStringSliceFuncIntegerReducer(fn StringReduceIntegerSliceFunc) *StringSliceFuncIntegerReducer {
+	return &StringSliceFuncIntegerReducer{fn: fn}
+}
+
+func (r *StringSliceFuncIntegerReducer) Aggregate(points ...*StringPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]StringPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *StringSliceFuncIntegerReducer) Emit() []IntegerPoint {
+	return r.fn(r.points)
 }
 
 // StringReduceFunc is the function called by a StringPoint reducer.
@@ -318,19 +718,59 @@ func NewStringFuncReducer(fn StringReduceFunc) *StringFuncReducer {
 	return &StringFuncReducer{fn: fn}
 }
 
-func (r *StringFuncReducer) Aggregate(p *StringPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &StringPoint{}
+func (r *StringFuncReducer) Aggregate(points ...*StringPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &StringPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *StringFuncReducer) Emit() *StringPoint {
-	return r.prev
+func (r *StringFuncReducer) Emit() []StringPoint {
+	return []StringPoint{*r.prev}
+}
+
+// StringReduceSliceFunc is the function called by a StringPoint reducer.
+type StringReduceSliceFunc func(a []StringPoint) []StringPoint
+
+type StringSliceFuncReducer struct {
+	points []StringPoint
+	fn     StringReduceSliceFunc
+}
+
+func NewStringSliceFuncReducer(fn StringReduceSliceFunc) *StringSliceFuncReducer {
+	return &StringSliceFuncReducer{fn: fn}
+}
+
+func (r *StringSliceFuncReducer) Aggregate(points ...*StringPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]StringPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *StringSliceFuncReducer) Emit() []StringPoint {
+	return r.fn(r.points)
 }
 
 // StringReduceBooleanFunc is the function called by a StringPoint reducer.
@@ -345,29 +785,69 @@ func NewStringFuncBooleanReducer(fn StringReduceBooleanFunc) *StringFuncBooleanR
 	return &StringFuncBooleanReducer{fn: fn}
 }
 
-func (r *StringFuncBooleanReducer) Aggregate(p *StringPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &BooleanPoint{}
+func (r *StringFuncBooleanReducer) Aggregate(points ...*StringPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &BooleanPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *StringFuncBooleanReducer) Emit() *BooleanPoint {
-	return r.prev
+func (r *StringFuncBooleanReducer) Emit() []BooleanPoint {
+	return []BooleanPoint{*r.prev}
+}
+
+// StringReduceBooleanSliceFunc is the function called by a StringPoint reducer.
+type StringReduceBooleanSliceFunc func(a []StringPoint) []BooleanPoint
+
+type StringSliceFuncBooleanReducer struct {
+	points []StringPoint
+	fn     StringReduceBooleanSliceFunc
+}
+
+func NewStringSliceFuncBooleanReducer(fn StringReduceBooleanSliceFunc) *StringSliceFuncBooleanReducer {
+	return &StringSliceFuncBooleanReducer{fn: fn}
+}
+
+func (r *StringSliceFuncBooleanReducer) Aggregate(points ...*StringPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]StringPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *StringSliceFuncBooleanReducer) Emit() []BooleanPoint {
+	return r.fn(r.points)
 }
 
 // BooleanPointAggregator aggregates points to produce a single point.
 type BooleanPointAggregator interface {
-	Aggregate(p *BooleanPoint)
+	Aggregate(points ...*BooleanPoint)
 }
 
 // BooleanPointEmitter produces a single point from an aggregate.
 type BooleanPointEmitter interface {
-	Emit() *BooleanPoint
+	Emit() []BooleanPoint
 }
 
 // BooleanReduceFloatFunc is the function called by a BooleanPoint reducer.
@@ -382,19 +862,59 @@ func NewBooleanFuncFloatReducer(fn BooleanReduceFloatFunc) *BooleanFuncFloatRedu
 	return &BooleanFuncFloatReducer{fn: fn}
 }
 
-func (r *BooleanFuncFloatReducer) Aggregate(p *BooleanPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &FloatPoint{}
+func (r *BooleanFuncFloatReducer) Aggregate(points ...*BooleanPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &FloatPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *BooleanFuncFloatReducer) Emit() *FloatPoint {
-	return r.prev
+func (r *BooleanFuncFloatReducer) Emit() []FloatPoint {
+	return []FloatPoint{*r.prev}
+}
+
+// BooleanReduceFloatSliceFunc is the function called by a BooleanPoint reducer.
+type BooleanReduceFloatSliceFunc func(a []BooleanPoint) []FloatPoint
+
+type BooleanSliceFuncFloatReducer struct {
+	points []BooleanPoint
+	fn     BooleanReduceFloatSliceFunc
+}
+
+func NewBooleanSliceFuncFloatReducer(fn BooleanReduceFloatSliceFunc) *BooleanSliceFuncFloatReducer {
+	return &BooleanSliceFuncFloatReducer{fn: fn}
+}
+
+func (r *BooleanSliceFuncFloatReducer) Aggregate(points ...*BooleanPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]BooleanPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *BooleanSliceFuncFloatReducer) Emit() []FloatPoint {
+	return r.fn(r.points)
 }
 
 // BooleanReduceIntegerFunc is the function called by a BooleanPoint reducer.
@@ -409,19 +929,59 @@ func NewBooleanFuncIntegerReducer(fn BooleanReduceIntegerFunc) *BooleanFuncInteg
 	return &BooleanFuncIntegerReducer{fn: fn}
 }
 
-func (r *BooleanFuncIntegerReducer) Aggregate(p *BooleanPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &IntegerPoint{}
+func (r *BooleanFuncIntegerReducer) Aggregate(points ...*BooleanPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &IntegerPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *BooleanFuncIntegerReducer) Emit() *IntegerPoint {
-	return r.prev
+func (r *BooleanFuncIntegerReducer) Emit() []IntegerPoint {
+	return []IntegerPoint{*r.prev}
+}
+
+// BooleanReduceIntegerSliceFunc is the function called by a BooleanPoint reducer.
+type BooleanReduceIntegerSliceFunc func(a []BooleanPoint) []IntegerPoint
+
+type BooleanSliceFuncIntegerReducer struct {
+	points []BooleanPoint
+	fn     BooleanReduceIntegerSliceFunc
+}
+
+func NewBooleanSliceFuncIntegerReducer(fn BooleanReduceIntegerSliceFunc) *BooleanSliceFuncIntegerReducer {
+	return &BooleanSliceFuncIntegerReducer{fn: fn}
+}
+
+func (r *BooleanSliceFuncIntegerReducer) Aggregate(points ...*BooleanPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]BooleanPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *BooleanSliceFuncIntegerReducer) Emit() []IntegerPoint {
+	return r.fn(r.points)
 }
 
 // BooleanReduceStringFunc is the function called by a BooleanPoint reducer.
@@ -436,19 +996,59 @@ func NewBooleanFuncStringReducer(fn BooleanReduceStringFunc) *BooleanFuncStringR
 	return &BooleanFuncStringReducer{fn: fn}
 }
 
-func (r *BooleanFuncStringReducer) Aggregate(p *BooleanPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &StringPoint{}
+func (r *BooleanFuncStringReducer) Aggregate(points ...*BooleanPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &StringPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *BooleanFuncStringReducer) Emit() *StringPoint {
-	return r.prev
+func (r *BooleanFuncStringReducer) Emit() []StringPoint {
+	return []StringPoint{*r.prev}
+}
+
+// BooleanReduceStringSliceFunc is the function called by a BooleanPoint reducer.
+type BooleanReduceStringSliceFunc func(a []BooleanPoint) []StringPoint
+
+type BooleanSliceFuncStringReducer struct {
+	points []BooleanPoint
+	fn     BooleanReduceStringSliceFunc
+}
+
+func NewBooleanSliceFuncStringReducer(fn BooleanReduceStringSliceFunc) *BooleanSliceFuncStringReducer {
+	return &BooleanSliceFuncStringReducer{fn: fn}
+}
+
+func (r *BooleanSliceFuncStringReducer) Aggregate(points ...*BooleanPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]BooleanPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *BooleanSliceFuncStringReducer) Emit() []StringPoint {
+	return r.fn(r.points)
 }
 
 // BooleanReduceFunc is the function called by a BooleanPoint reducer.
@@ -463,17 +1063,57 @@ func NewBooleanFuncReducer(fn BooleanReduceFunc) *BooleanFuncReducer {
 	return &BooleanFuncReducer{fn: fn}
 }
 
-func (r *BooleanFuncReducer) Aggregate(p *BooleanPoint) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &BooleanPoint{}
+func (r *BooleanFuncReducer) Aggregate(points ...*BooleanPoint) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &BooleanPoint{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-	r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *BooleanFuncReducer) Emit() *BooleanPoint {
-	return r.prev
+func (r *BooleanFuncReducer) Emit() []BooleanPoint {
+	return []BooleanPoint{*r.prev}
+}
+
+// BooleanReduceSliceFunc is the function called by a BooleanPoint reducer.
+type BooleanReduceSliceFunc func(a []BooleanPoint) []BooleanPoint
+
+type BooleanSliceFuncReducer struct {
+	points []BooleanPoint
+	fn     BooleanReduceSliceFunc
+}
+
+func NewBooleanSliceFuncReducer(fn BooleanReduceSliceFunc) *BooleanSliceFuncReducer {
+	return &BooleanSliceFuncReducer{fn: fn}
+}
+
+func (r *BooleanSliceFuncReducer) Aggregate(points ...*BooleanPoint) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points)+len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]BooleanPoint, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *BooleanSliceFuncReducer) Emit() []BooleanPoint {
+	return r.fn(r.points)
 }

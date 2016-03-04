@@ -4,12 +4,12 @@ package influxql
 
 // {{$k.Name}}PointAggregator aggregates points to produce a single point.
 type {{$k.Name}}PointAggregator interface {
-	Aggregate(p *{{.Name}}Point)
+	Aggregate(points ...*{{.Name}}Point)
 }
 
 // {{$k.Name}}PointEmitter produces a single point from an aggregate.
 type {{$k.Name}}PointEmitter interface {
-	Emit() *{{$k.Name}}Point
+	Emit() []{{$k.Name}}Point
 }
 
 {{range $v := $types}}
@@ -26,18 +26,58 @@ func New{{$k.Name}}Func{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer(fn {{$
 	return &{{$k.Name}}Func{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer{fn: fn}
 }
 
-func (r *{{$k.Name}}Func{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer) Aggregate(p *{{$k.Name}}Point) {
-	t, v, aux := r.fn(r.prev, p)
-	if r.prev == nil {
-		r.prev = &{{$v.Name}}Point{}
+func (r *{{$k.Name}}Func{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer) Aggregate(points ...*{{$k.Name}}Point) {
+	for _, p := range points {
+		t, v, aux := r.fn(r.prev, p)
+		if r.prev == nil {
+			r.prev = &{{$v.Name}}Point{}
+		}
+		r.prev.Time = t
+		r.prev.Value = v
+		r.prev.Aux = aux
+		if p.Aggregated > 1 {
+			r.prev.Aggregated += p.Aggregated
+		} else {
+			r.prev.Aggregated++
+		}
 	}
-  r.prev.Time = t
-	r.prev.Value = v
-	r.prev.Aux = aux
-	r.prev.Aggregated++
 }
 
-func (r *{{$k.Name}}Func{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer) Emit() *{{$v.Name}}Point {
-	return r.prev
+func (r *{{$k.Name}}Func{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer) Emit() []{{$v.Name}}Point {
+	return []{{$v.Name}}Point{*r.prev}
+}
+
+// {{$k.Name}}Reduce{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}SliceFunc is the function called by a {{$k.Name}}Point reducer.
+type {{$k.Name}}Reduce{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}SliceFunc func(a []{{$k.Name}}Point) []{{$v.Name}}Point
+
+type {{$k.Name}}SliceFunc{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer struct {
+	points []{{$k.Name}}Point
+	fn     {{$k.Name}}Reduce{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}SliceFunc
+}
+
+func New{{$k.Name}}SliceFunc{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer(fn {{$k.Name}}Reduce{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}SliceFunc) *{{$k.Name}}SliceFunc{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer {
+	return &{{$k.Name}}SliceFunc{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer{fn: fn}
+}
+
+func (r *{{$k.Name}}SliceFunc{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer) Aggregate(points ...*{{$k.Name}}Point) {
+	if len(points) == 1 {
+		r.points = append(r.points, *points[0])
+	} else if len(points) > 1 {
+		if len(r.points) + len(points) <= cap(r.points) {
+			for _, p := range points {
+				r.points = append(r.points, *p)
+			}
+		} else {
+			pts := make([]{{$k.Name}}Point, len(points))
+			for i, p := range points {
+				pts[i] = *p
+			}
+			r.points = append(r.points, pts...)
+		}
+	}
+}
+
+func (r *{{$k.Name}}SliceFunc{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}Reducer) Emit() []{{$v.Name}}Point {
+	return r.fn(r.points)
 }
 {{end}}{{end}}{{end}}
